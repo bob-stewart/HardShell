@@ -5,3 +5,8 @@ logs/
 # Local overrides
 *.local
 .env
+
+# env runtime/secrets
+environments/**/secrets/
+environments/**/run/
+environments/**/logs/
