@@ -1,0 +1,7 @@
+# Evidence bundles & logs (local)
+evidence/
+logs/
+
+# Local overrides
+*.local
+.env
