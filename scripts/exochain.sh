@@ -3,14 +3,19 @@ set -euo pipefail
 
 # EXOCHAIN helper script (local container execution)
 # Usage:
-#   ./scripts/exochain.sh fmt|clippy|test|build|evidence
+#   ./scripts/exochain.sh fmt|clippy|test|build|evidence|check|all
+#
+# - check: fmt (check) + clippy + test
+# - all:   check + evidence
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-EXOCHAIN_DIR="$ROOT_DIR/Business/EXOCHAIN/dev/exochain"
-HARDSHELL_DIR="$ROOT_DIR/Business/EXOCHAIN/dev/hardshell"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HARDSHELL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+DEV_DIR="$(cd "$HARDSHELL_DIR/.." && pwd)"   # Business/EXOCHAIN/dev
+EXOCHAIN_DIR="$DEV_DIR/exochain"
 
 if [[ ! -d "$EXOCHAIN_DIR" ]]; then
   echo "EXOCHAIN_DIR not found: $EXOCHAIN_DIR" >&2
+  echo "Expected EXOCHAIN at: $DEV_DIR/exochain" >&2
   exit 1
 fi
 
@@ -26,6 +31,10 @@ case "$cmd" in
     cd "$EXOCHAIN_DIR"
     cargo fmt --all
     ;;
+  fmt-check)
+    cd "$EXOCHAIN_DIR"
+    cargo fmt --all -- --check
+    ;;
   clippy)
     cd "$EXOCHAIN_DIR"
     cargo clippy --workspace --all-targets -- -D warnings
@@ -40,6 +49,16 @@ case "$cmd" in
     ;;
   evidence)
     EXOCHAIN_DIR="$EXOCHAIN_DIR" "$HARDSHELL_DIR/scripts/evidence.sh"
+    ;;
+  check)
+    cd "$EXOCHAIN_DIR"
+    cargo fmt --all -- --check
+    cargo clippy --workspace --all-targets -- -D warnings
+    cargo test --workspace --all-targets
+    ;;
+  all)
+    "$0" check
+    "$0" evidence
     ;;
   *)
     echo "Unknown command: $cmd" >&2
