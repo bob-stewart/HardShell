@@ -107,4 +107,10 @@ files:
 - artifact-hashes.sha256
 MAN
 
+# Register evidence in MeshCORE if available (best-effort)
+MESHCORE_DIR_DEFAULT="$(cd "$ROOT_DIR/../../.." && pwd)/meshcore"
+if [[ -d "$MESHCORE_DIR_DEFAULT/.git" ]]; then
+  EVIDENCE_DIR="$out" MESHCORE_DIR="$MESHCORE_DIR_DEFAULT" "$ROOT_DIR/scripts/meshcore-register-evidence.sh" >"$out/meshcore-register.txt" 2>&1 || true
+fi
+
 echo "$out"
