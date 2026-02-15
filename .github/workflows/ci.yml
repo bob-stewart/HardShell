@@ -1,0 +1,23 @@
+name: HardShell CI
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+  workflow_dispatch: {}
+
+jobs:
+  sanity:
+    name: shell sanity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure scripts are executable
+        run: |
+          test -x scripts/exochain.sh
+
+      - name: Bash syntax check
+        run: |
+          bash -n scripts/exochain.sh
