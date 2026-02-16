@@ -1,18 +1,17 @@
 #!/usr/bin/env node
 /*
-  IRB Sentinel (v0)
+  IRB Sentinel (v1)
 
-  Purpose:
-  - Detect whether a change touches gateable surfaces (path-based heuristic for now)
-  - If so, open an IRB case in MeshCORE and run a multi-model crosscheck
-  - Write artifacts into MeshCORE:
-    - projects/ai-irb/cases/<caseId>.json
-    - projects/ai-irb/crosschecks/<reportId>.json (decision.forum CrosscheckReport)
-    - projects/ai-irb/findings/<findingId>.json
+  Public-reproducible BYOK holon sentinel:
+  - Detect gateable surfaces (conservative path heuristics)
+  - REQUIRE evidence id for gateable surfaces (fail-closed)
+  - Run a multi-model panel via OpenRouter (BYOK)
+  - Write artifacts to MeshCORE (case, crosscheck, finding, receipts)
 
   Safety:
-  - Does NOT modify system configs or expose network services.
-  - Only writes files in MeshCORE and commits them.
+  - Does NOT expose services publicly.
+  - Does NOT change system config.
+  - Only writes auditable artifacts into MeshCORE.
 */
 
 const fs = require('fs');
@@ -47,9 +46,8 @@ function getWorkspacePaths() {
   const hardshellDir = path.resolve(scriptDir, '..');
   const devDir = path.resolve(hardshellDir, '..'); // Business/EXOCHAIN/dev
   const businessDir = path.resolve(devDir, '../..');
-  const exochainDir = path.join(devDir, 'exochain');
   const meshcoreDir = path.join(businessDir, 'meshcore');
-  return { hardshellDir, exochainDir, meshcoreDir };
+  return { hardshellDir, devDir, businessDir, meshcoreDir };
 }
 
 function detectGateableSurfaces(changedFiles) {
@@ -69,65 +67,66 @@ function detectGateableSurfaces(changedFiles) {
   return { isGateable, surfaces: [...surfaces] };
 }
 
-async function callOpenAI(prompt) {
-  const key = mustEnv('OPENAI_API_KEY');
-  const res = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-5.2',
-      input: prompt,
-      reasoning: { effort: 'low' },
-    }),
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error(`OpenAI error: ${res.status} ${JSON.stringify(json).slice(0, 500)}`);
-  const text = (json.output_text || '').trim();
-  return { provider: 'openai', model: json.model || 'gpt-5.2', text };
-}
-
-async function callAnthropic(prompt) {
-  const key = mustEnv('ANTHROPIC_API_KEY');
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 800,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error(`Anthropic error: ${res.status} ${JSON.stringify(json).slice(0, 500)}`);
-  const text = (json.content || []).map((b) => b.text || '').join('').trim();
-  return { provider: 'anthropic', model: json.model || 'claude-sonnet-4-5', text };
-}
-
-async function callXAI(prompt) {
-  const key = mustEnv('XAI_API_KEY');
-  const res = await fetch('https://api.x.ai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'grok-4-1-fast-reasoning',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.2,
-    }),
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error(`xAI error: ${res.status} ${JSON.stringify(json).slice(0, 500)}`);
-  const text = (json.choices?.[0]?.message?.content || '').trim();
-  return { provider: 'xai', model: json.model || 'grok-4-1-fast-reasoning', text };
+async function openrouterChat({ model, prompt, timeoutMs = 60_000 }) {
+  const key = mustEnv('OPENROUTER_API_KEY');
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  const started = Date.now();
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.2,
+        max_tokens: 900,
+      }),
+      signal: controller.signal,
+    });
+    const latencyMs = Date.now() - started;
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return {
+        status: 'ERROR',
+        provider: 'openrouter',
+        model,
+        latencyMs,
+        error: `http=${res.status} body=${JSON.stringify(json).slice(0, 500)}`,
+        text: `ERROR: openrouter ${res.status}`,
+        tokensIn: 0,
+        tokensOut: 0,
+      };
+    }
+    const text = (json.choices?.[0]?.message?.content || '').trim();
+    const usage = json.usage || {};
+    return {
+      status: 'OK',
+      provider: 'openrouter',
+      model,
+      latencyMs,
+      text,
+      tokensIn: usage.prompt_tokens || 0,
+      tokensOut: usage.completion_tokens || 0,
+    };
+  } catch (e) {
+    const latencyMs = Date.now() - started;
+    return {
+      status: 'ERROR',
+      provider: 'openrouter',
+      model,
+      latencyMs,
+      error: String(e?.message || e),
+      text: `ERROR: ${String(e?.message || e)}`,
+      tokensIn: 0,
+      tokensOut: 0,
+    };
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 function mkPanelPrompt({ summary, surfaces, evidenceIds }) {
@@ -147,7 +146,7 @@ function mkPanelPrompt({ summary, surfaces, evidenceIds }) {
 }
 
 function parsePanel(text) {
-  const upper = text.toUpperCase();
+  const upper = (text || '').toUpperCase();
   const risk = (upper.match(/RISK\s*:\s*(LOW|MEDIUM|HIGH|CRITICAL)/) || [])[1] || 'MEDIUM';
   const rec = (upper.match(/RECOMMENDATION\s*:\s*(APPROVE|REQUEST_CHANGES|REJECT)/) || [])[1] || 'REQUEST_CHANGES';
   return { risk, recommendation: rec };
@@ -163,7 +162,7 @@ async function main() {
   const evidenceId = process.env.EVIDENCE_ID || '';
   const evidenceIds = evidenceId ? [evidenceId] : [];
 
-  // determine change set in current repo
+  // Determine change set in current repo
   let changedFiles = [];
   try {
     const out = exec('git diff --name-only HEAD~1..HEAD', process.cwd());
@@ -176,6 +175,28 @@ async function main() {
   if (!det.isGateable) {
     console.log('NO_GATEABLE_SURFACES_DETECTED');
     process.exit(0);
+  }
+
+  // Fail-closed if no evidence id
+  if (!evidenceId) {
+    const caseId = randId('IRB');
+    const createdAt = nowIso();
+    const irbCase = {
+      id: caseId,
+      createdAt,
+      severity: 'HIGH',
+      summary: `${summary} (missing evidence id)` ,
+      status: 'ESCALATED',
+      affectedSurfaces: det.surfaces,
+      evidenceIds: [],
+      links: [],
+    };
+    const casePath = path.join(meshcoreDir, 'projects/ai-irb/cases', `${caseId}.json`);
+    writeJson(casePath, irbCase);
+    exec('git add projects/ai-irb/cases', meshcoreDir);
+    try { exec(`git commit -m "chore(ai-irb): open ${caseId} (missing evidence)"`, meshcoreDir); } catch {}
+    console.log(JSON.stringify({ caseId, escalated: true, reason: 'missing evidence id' }, null, 2));
+    process.exit(3);
   }
 
   const caseId = randId('IRB');
@@ -197,20 +218,47 @@ async function main() {
 
   const prompt = mkPanelPrompt({ summary, surfaces: det.surfaces, evidenceIds });
 
-  const started = Date.now();
-  const results = await Promise.all([
-    callOpenAI(prompt).catch((e) => ({ provider: 'openai', model: 'gpt-5.2', text: `ERROR: ${e.message}` })),
-    callAnthropic(prompt).catch((e) => ({ provider: 'anthropic', model: 'claude-sonnet-4-5', text: `ERROR: ${e.message}` })),
-    callXAI(prompt).catch((e) => ({ provider: 'xai', model: 'grok-4-1-fast-reasoning', text: `ERROR: ${e.message}` })),
-  ]);
-  const latencyMs = Date.now() - started;
+  // Required trio + optional Gemini
+  const models = [
+    'openai/gpt-5.2',
+    'anthropic/claude-opus-4-6',
+    'xai/grok-4-1',
+    'google/gemini-3-pro'
+  ];
+
+  const results = [];
+  for (const m of models) {
+    results.push(await openrouterChat({ model: m, prompt }));
+  }
+
+  // Create receipts
+  const receiptIds = [];
+  for (const r of results) {
+    const rid = randId('RCPT');
+    receiptIds.push(rid);
+    const receipt = {
+      id: rid,
+      createdAt: nowIso(),
+      kind: 'llm-call',
+      provider: r.provider,
+      model: r.model,
+      latencyMs: r.latencyMs,
+      tokensIn: r.tokensIn,
+      tokensOut: r.tokensOut,
+      status: r.status,
+      error: r.error || '',
+      metadata: { purpose: 'ai-irb-panel' }
+    };
+    const rp = path.join(meshcoreDir, 'projects/ai-irb/receipts', `${rid}.json`);
+    writeJson(rp, receipt);
+  }
 
   const opinions = results.map((r) => {
     const parsed = parsePanel(r.text);
     return {
-      agent_id: `did:meshcore:${r.provider}`,
+      agent_id: `did:meshcore:${r.model}`,
       agent_kind: 'ai',
-      agent_label: r.provider,
+      agent_label: r.model,
       model: r.model,
       policy_id: 'ai-irb-v0',
       stance: parsed.recommendation.toLowerCase(),
@@ -220,9 +268,13 @@ async function main() {
     };
   });
 
-  const stances = opinions.map((o) => (o.summary.startsWith('ERROR') ? 'ERROR' : o.stance));
-  const converged = new Set(stances.filter((s) => s !== 'ERROR')).size === 1 && !stances.includes('ERROR');
-  const dissent = converged ? '' : 'Panel did not fully converge or an agent errored.';
+  // Convergence rule: the required trio must be OK and must match recommendation.
+  const required = results.slice(0, 3);
+  const requiredOk = required.every((r) => r.status === 'OK' && r.text && !r.text.startsWith('ERROR'));
+  const requiredStances = required.map((r) => parsePanel(r.text).recommendation);
+  const converged = requiredOk && new Set(requiredStances).size === 1;
+
+  const dissent = converged ? '' : 'Panel did not converge or required provider errored.';
 
   const crosscheck = {
     schema_version: '0.2',
@@ -235,7 +287,7 @@ async function main() {
     synthesis: converged ? 'Converged.' : 'Not converged.',
     dissent,
     dissenters: [],
-    metadata: { latencyMs },
+    metadata: { receipts: receiptIds }
   };
 
   const finding = {
@@ -246,7 +298,7 @@ async function main() {
     converged,
     summary: converged ? 'Converged' : 'Not converged',
     dissent,
-    recommendation: converged ? 'Proceed with gates satisfied' : 'Escalate to Chair',
+    recommendation: converged ? 'Proceed with gates satisfied' : 'Escalate to Chair'
   };
 
   if (!converged) {
@@ -262,15 +314,10 @@ async function main() {
   writeJson(crossPath, crosscheck);
   writeJson(findPath, finding);
 
-  // commit artifacts
-  exec('git add projects/ai-irb/cases projects/ai-irb/crosschecks projects/ai-irb/findings', meshcoreDir);
-  try {
-    exec(`git commit -m "chore(ai-irb): open ${caseId}"`, meshcoreDir);
-  } catch {
-    // ignore
-  }
+  exec('git add projects/ai-irb/cases projects/ai-irb/crosschecks projects/ai-irb/findings projects/ai-irb/receipts', meshcoreDir);
+  try { exec(`git commit -m "chore(ai-irb): open ${caseId}"`, meshcoreDir); } catch {}
 
-  console.log(JSON.stringify({ caseId, reportId, findingId, converged, severity: irbCase.severity, latencyMs }, null, 2));
+  console.log(JSON.stringify({ caseId, reportId, findingId, converged, severity: irbCase.severity, receipts: receiptIds }, null, 2));
 
   if (irbCase.status === 'ESCALATED') process.exit(3);
 }
