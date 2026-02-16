@@ -67,12 +67,33 @@ function detectGateableSurfaces(changedFiles) {
   return { isGateable, surfaces: [...surfaces] };
 }
 
-async function openrouterChat({ model, prompt, timeoutMs = 60_000 }) {
+function envInt(name, fallback) {
+  const raw = process.env[name];
+  if (raw == null || raw === '') return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function parseCsv(raw) {
+  return (raw || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function parseAffordabilityMaxTokens(msg) {
+  // Example: "requested up to 900 tokens, but can only afford 792"
+  const m = String(msg || '').match(/can only afford\s+(\d+)/i);
+  return m ? Number(m[1]) : null;
+}
+
+async function openrouterChat({ model, prompt, timeoutMs = 60_000, maxTokens }) {
   const key = mustEnv('OPENROUTER_API_KEY');
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), timeoutMs);
   const started = Date.now();
-  try {
+
+  async function attempt(mt) {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -83,12 +104,32 @@ async function openrouterChat({ model, prompt, timeoutMs = 60_000 }) {
         model,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.2,
-        max_tokens: 900,
+        max_tokens: mt,
       }),
       signal: controller.signal,
     });
     const latencyMs = Date.now() - started;
     const json = await res.json().catch(() => ({}));
+    return { res, json, latencyMs };
+  }
+
+  try {
+    const mt0 = Number.isFinite(maxTokens) ? maxTokens : 900;
+    let { res, json, latencyMs } = await attempt(mt0);
+
+    // If we hit OpenRouter affordability (402) and it tells us the max we can afford,
+    // retry once with a slightly smaller max_tokens.
+    if (res.status === 402) {
+      const msg = json?.error?.message || JSON.stringify(json);
+      const afford = parseAffordabilityMaxTokens(msg);
+      if (Number.isFinite(afford) && afford > 64) {
+        const mt1 = Math.max(64, Math.min(mt0, afford - 32));
+        if (mt1 < mt0) {
+          ({ res, json, latencyMs } = await attempt(mt1));
+        }
+      }
+    }
+
     if (!res.ok) {
       return {
         status: 'ERROR',
@@ -101,6 +142,7 @@ async function openrouterChat({ model, prompt, timeoutMs = 60_000 }) {
         tokensOut: 0,
       };
     }
+
     const text = (json.choices?.[0]?.message?.content || '').trim();
     const usage = json.usage || {};
     return {
@@ -126,6 +168,22 @@ async function openrouterChat({ model, prompt, timeoutMs = 60_000 }) {
     };
   } finally {
     clearTimeout(t);
+  }
+}
+
+async function openrouterFilterValidModels(models) {
+  // Best-effort: if OpenRouter model listing is reachable, drop invalid IDs so we can still converge.
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/models', {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) return models;
+    const json = await res.json().catch(() => ({}));
+    const ids = new Set((json?.data || []).map((m) => m?.id).filter(Boolean));
+    const valid = models.filter((m) => ids.has(m));
+    return valid.length ? valid : models;
+  } catch {
+    return models;
   }
 }
 
@@ -229,18 +287,26 @@ async function main() {
 
   const prompt = mkPanelPrompt({ summary, surfaces: det.surfaces, evidenceIds });
 
-  // Required trio + optional Gemini
-  const models = [
+  const maxTokens = envInt('IRB_MAX_TOKENS', 900);
+  const requiredCount = envInt('IRB_REQUIRED_COUNT', 3);
+
+  // Models are configurable so others can BYOK without code changes.
+  const defaultModels = [
     'openai/gpt-5.2',
     'anthropic/claude-opus-4-6',
-    // OpenRouter canonical IDs (previous hyphenated IDs were invalid)
     'x-ai/grok-4.1-fast',
     'google/gemini-3-pro-preview'
   ];
+  const modelsRaw = process.env.IRB_MODELS || '';
+  let models = parseCsv(modelsRaw);
+  if (!models.length) models = defaultModels;
+
+  // Best-effort: drop invalid OpenRouter model IDs to avoid guaranteed non-convergence.
+  models = await openrouterFilterValidModels(models);
 
   const results = [];
   for (const m of models) {
-    results.push(await openrouterChat({ model: m, prompt }));
+    results.push(await openrouterChat({ model: m, prompt, maxTokens }));
   }
 
   // Create receipts
@@ -280,8 +346,8 @@ async function main() {
     };
   });
 
-  // Convergence rule: the required trio must be OK and must match recommendation.
-  const required = results.slice(0, 3);
+  // Convergence rule: first N models (default 3) must be OK and must match recommendation.
+  const required = results.slice(0, Math.max(1, requiredCount));
   const requiredOk = required.every((r) => r.status === 'OK' && r.text && !r.text.startsWith('ERROR'));
   const requiredStances = required.map((r) => parsePanel(r.text).recommendation);
   const converged = requiredOk && new Set(requiredStances).size === 1;
