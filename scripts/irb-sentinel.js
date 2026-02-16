@@ -287,7 +287,7 @@ async function main() {
 
   const prompt = mkPanelPrompt({ summary, surfaces: det.surfaces, evidenceIds });
 
-  const maxTokens = envInt('IRB_MAX_TOKENS', 900);
+  const maxTokens = envInt('IRB_MAX_TOKENS', 4096);
   const requiredCount = envInt('IRB_REQUIRED_COUNT', 3);
 
   // Models are configurable so others can BYOK without code changes.
