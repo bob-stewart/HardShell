@@ -233,8 +233,9 @@ async function main() {
   const models = [
     'openai/gpt-5.2',
     'anthropic/claude-opus-4-6',
-    'xai/grok-4-1',
-    'google/gemini-3-pro'
+    // OpenRouter canonical IDs (previous hyphenated IDs were invalid)
+    'x-ai/grok-4.1-fast',
+    'google/gemini-3-pro-preview'
   ];
 
   const results = [];
