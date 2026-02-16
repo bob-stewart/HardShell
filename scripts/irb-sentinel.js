@@ -171,10 +171,21 @@ async function main() {
     // ignore
   }
 
+  const force = process.env.IRB_FORCE === '1' || process.env.IRB_FORCE === 'true';
+  const forcedSurfaces = (process.env.IRB_SURFACES || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
   const det = detectGateableSurfaces(changedFiles);
-  if (!det.isGateable) {
+  if (!det.isGateable && !force) {
     console.log('NO_GATEABLE_SURFACES_DETECTED');
     process.exit(0);
+  }
+
+  if (force && forcedSurfaces.length) {
+    det.surfaces = Array.from(new Set([...det.surfaces, ...forcedSurfaces]));
+    det.isGateable = true;
   }
 
   // Fail-closed if no evidence id
