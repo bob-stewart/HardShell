@@ -325,10 +325,138 @@ async function main() {
   writeJson(crossPath, crosscheck);
   writeJson(findPath, finding);
 
-  exec('git add projects/ai-irb/cases projects/ai-irb/crosschecks projects/ai-irb/findings projects/ai-irb/receipts', meshcoreDir);
-  try { exec(`git commit -m "chore(ai-irb): open ${caseId}"`, meshcoreDir); } catch {}
+  // Improvement backlog artifact (proposal-only, non-invasive)
+  const ts = new Date();
+  const yyyy = String(ts.getUTCFullYear());
+  const mm = String(ts.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(ts.getUTCDate()).padStart(2, '0');
+  const hh = String(ts.getUTCHours()).padStart(2, '0');
 
-  console.log(JSON.stringify({ caseId, reportId, findingId, converged, severity: irbCase.severity, receipts: receiptIds }, null, 2));
+  const okCount = results.filter((r) => r.status === 'OK').length;
+  const errCount = results.length - okCount;
+  const latencies = results
+    .map((r) => r.latencyMs)
+    .filter((n) => Number.isFinite(n))
+    .sort((a, b) => a - b);
+  const p50 = latencies.length ? latencies[Math.floor(latencies.length / 2)] : null;
+
+  const backlog = {
+    schema: 'meshcore.irb.improvement.v1',
+    run: {
+      job_id: process.env.IRB_JOB_ID || '',
+      timestamp_utc: nowIso(),
+      commit_range: null,
+      forced: true,
+      irb_force: process.env.IRB_FORCE === '1' || process.env.IRB_FORCE === 'true',
+      irb_surfaces: (process.env.IRB_SURFACES || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    },
+    links: {
+      evidence_bundle: evidenceIds[0] || '',
+      case: caseId,
+      findings: findingId,
+      crosscheck: reportId,
+      receipts: receiptIds
+    },
+    signals: {
+      provider_reliability: {
+        provider: 'openrouter',
+        success_rate_1h: results.length ? okCount / results.length : 0,
+        error_rate_1h: results.length ? errCount / results.length : 0,
+        median_latency_ms: p50
+      },
+      convergence: {
+        attempts: 1,
+        pass_rate: converged ? 1 : 0,
+        common_disagreements: []
+      },
+      adverse_events: {
+        count: errCount,
+        events: results
+          .filter((r) => r.status === 'ERROR')
+          .map((r) => ({ model: r.model, error: r.error || '' }))
+      }
+    },
+    proposals: [
+      {
+        id: `IRB-PROP-${yyyy}${mm}${dd}-${hh}-001`,
+        title: 'TBD (auto-generated placeholder) — propose a safe improvement backed by receipts',
+        holon: 'Moats: Data & Learning Loops',
+        surface: 'irb-sentinel',
+        risk: 'GREEN',
+        why_now: 'Hourly loop running; collect signals and propose bounded improvements.',
+        expected_impact: { metric: 'convergence.pass_rate', direction: 'up', confidence: 0.5 },
+        evidence: [
+          { ref: `receipts:${receiptIds[0] || ''}`, note: 'See receipts for provider reliability.' }
+        ],
+        guardrails: [
+          'No permissions/allowlists changes',
+          'No network exposure changes',
+          'No destructive ops',
+          'No escalation routing changes'
+        ],
+        next_action: 'QUEUE_FOR_REVIEW'
+      }
+    ],
+    routing: {
+      forums: [
+        { name: 'Advantage Forum', reason: 'learning loop consistency' },
+        { name: 'Ethics Forum', reason: 'severity/escalation semantics' }
+      ],
+      review_sla_hours: 72
+    }
+  };
+
+  const backlogDir = path.join(meshcoreDir, 'projects/ai-irb/backlog', yyyy, mm, dd, hh);
+  const backlogJson = path.join(backlogDir, 'irb-improvement.json');
+  const backlogMd = path.join(backlogDir, 'irb-improvement.md');
+
+  writeJson(backlogJson, backlog);
+  fs.writeFileSync(
+    backlogMd,
+    [
+      `# IRB Improvement Backlog — ${backlog.run.timestamp_utc}`,
+      '',
+      'Run:',
+      `- Job: ${backlog.run.job_id || '(unset)'}`,
+      `- Forced: ${backlog.run.irb_force ? 'yes' : 'no'}`,
+      `- Surfaces: ${(backlog.run.irb_surfaces || []).join(', ') || '(none)'}`,
+      `- Evidence: ${backlog.links.evidence_bundle || '(none)'}`,
+      `- Converged: ${converged ? 'yes' : 'no'}`,
+      `- Adverse events: ${errCount}`,
+      '',
+      'Key Signals:',
+      `- Provider reliability: success ${(backlog.signals.provider_reliability.success_rate_1h * 100).toFixed(0)}% | p50 latency ${p50 ?? '(n/a)'}ms`,
+      `- Convergence pass rate: ${converged ? '100%' : '0%'}`,
+      '',
+      'Proposals:',
+      `1) ${backlog.proposals[0].id} — ${backlog.proposals[0].title}`,
+      `   - Holon: ${backlog.proposals[0].holon}`,
+      `   - Surface: ${backlog.proposals[0].surface}`,
+      `   - Risk: ${backlog.proposals[0].risk}`,
+      `   - Next: ${backlog.proposals[0].next_action}`,
+      ''
+    ].join('\n'),
+    'utf8'
+  );
+
+  exec(
+    'git add projects/ai-irb/cases projects/ai-irb/crosschecks projects/ai-irb/findings projects/ai-irb/receipts projects/ai-irb/backlog',
+    meshcoreDir
+  );
+  try {
+    exec(`git commit -m "chore(ai-irb): open ${caseId}"`, meshcoreDir);
+  } catch {}
+
+  console.log(
+    JSON.stringify(
+      { caseId, reportId, findingId, converged, severity: irbCase.severity, receipts: receiptIds, backlog: path.relative(meshcoreDir, backlogJson) },
+      null,
+      2
+    )
+  );
 
   if (irbCase.status === 'ESCALATED') process.exit(3);
 }
