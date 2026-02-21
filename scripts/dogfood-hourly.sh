@@ -32,4 +32,20 @@ export EVIDENCE_ID="$eid"
 
 node ./scripts/irb-sentinel.js || true
 
+# 4) publish MeshCORE artifacts (best-effort)
+# We want GitHub links to resolve on mobile, so push commits to:
+# - main (canonical)
+# - dogfood/hourly (easy filter / optional PRs)
+if [[ -d "/data/.openclaw/workspace/Business/meshcore/.git" ]]; then
+  (
+    set +e
+    cd /data/.openclaw/workspace/Business/meshcore
+    # Keep the branch up-to-date locally; push non-interactively if creds exist.
+    git switch main >/dev/null 2>&1 || true
+    git push origin main >/dev/null 2>&1 || true
+    git switch -C dogfood/hourly >/dev/null 2>&1 || true
+    git push -u origin dogfood/hourly >/dev/null 2>&1 || true
+  )
+fi
+
 echo "DONE"
