@@ -40,11 +40,15 @@ if [[ -d "/data/.openclaw/workspace/Business/meshcore/.git" ]]; then
   (
     set +e
     cd /data/.openclaw/workspace/Business/meshcore
-    # Keep the branch up-to-date locally; push non-interactively if creds exist.
-    git switch main >/dev/null 2>&1 || true
-    git push origin main >/dev/null 2>&1 || true
-    git switch -C dogfood/hourly >/dev/null 2>&1 || true
-    git push -u origin dogfood/hourly >/dev/null 2>&1 || true
+    
+    # Safely push the newly generated commits to both branches without detaching HEAD
+    # or forcefully resetting local branches over unmerged work.
+    git push origin HEAD:refs/heads/main >/dev/null 2>&1 || true
+    git push -u origin HEAD:refs/heads/dogfood/hourly >/dev/null 2>&1 || true
+    
+    # Update local branch pointers to match the new commits
+    git branch -f main HEAD >/dev/null 2>&1 || true
+    git branch -f dogfood/hourly HEAD >/dev/null 2>&1 || true
   )
 fi
 
