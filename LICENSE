@@ -1,21 +1,92 @@
-MIT License
+EXOCHAIN™ SOURCE-AVAILABLE COMMERCIAL LICENSE v2.0
+Copyright © 2017-2026 EXOCHAIN PBC.
+All rights reserved Worldwide.
 
-Copyright (c) 2026 Bob Stewart
+This EXOCHAIN SOURCE-AVAILABLE COMMERCIAL LICENSE (the “License”) governs use of the accompanying software and associated files (the “Software”) when they are not expressly licensed under an open-source license such as MIT or Apache-2.0. If any file states or links to a different license, that other license controls for that file.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+By accessing, copying, or using the Software, you agree to be bound by this License. If you do not agree, you may not use the Software.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. Licensor and Contact
+The Software is licensed by EXOCHAIN PBC, a Delaware public benefit corporation (“EXOCHAIN”, “Licensor”).
+For questions about licensing, royalties, or commercial agreements, contact:
+ • General info: info@apexvelocity.ai
+ • Legal: legal@apexvelocity.ai
+ • Privacy: privacy@apexvelocity.ai
+ • Support: support@apexvelocity.ai
+ • Website: https://ApexVelocity.ai/
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. Source-Available Access (Non-Production)
+Subject to your full compliance with this License, Licensor grants you a limited, non-exclusive, non-transferable, revocable license to:
+ • View and study the source code of the Software.
+ • Clone and build the Software for internal evaluation, testing, and non-production experimentation.
+ • Make internal modifications and patches for the sole purpose of such non-production evaluation.
+
+You may not deploy or use the Software in any Production Use (as defined below) under this Section 2.
+
+3. Production Use Requires Commercial Agreement
+“Production Use” means any use of the Software, or any service that depends materially on the Software, in or for:
+ • Providing products or services to third parties (whether free or paid);
+ • Internal production workloads that support your or another party’s commercial, operational, or regulatory activities; or
+ • Any system relied upon by customers, patients, counterparties, or regulators.
+
+You may not engage in Production Use of the Software unless you have entered into a separate written commercial agreement with EXOCHAIN (a “Commercial Agreement”). That Commercial Agreement will specify your rights to Production Use, applicable fees, support terms, and any royalties, including the royalty terms in Section 4 if applicable.
+
+Absent a Commercial Agreement, all Production Use is prohibited.
+
+4. Royalty for Covered Offerings (10% Gross Evergreen)
+Certain Production Uses will be considered “Covered Offerings” and require a continuing royalty.
+
+4.1 Covered Offering.
+A “Covered Offering” is any product or service that:
+ • (a) is offered, sold, licensed, or otherwise monetized by you or your affiliates; and
+ • (b) uses the Software, or any substantial portion or modified version of it, as a material component of its functionality, especially for regulated-entity, governance, decision-record, or evidentiary workflows (including, without limitation, offerings built on or incorporating LegalDyne, decision.forum, CrossChecked, exoclaw, exoforge, hardshell, or EXOCHAIN-based rails).
+
+4.2 Royalty.
+Unless your Commercial Agreement explicitly states otherwise, for each Covered Offering you shall pay EXOCHAIN an ongoing royalty equal to ten percent (10%) of the gross revenue received by you and your affiliates from that Covered Offering, worldwide, for as long as that Covered Offering is offered or monetized (the “Royalty”).
+
+4.3 Gross Revenue.
+“Gross revenue” means the total amounts actually received by you or your affiliates from customers or third parties for the Covered Offering, before deductions of any kind, except for: (i) taxes separately stated and collected; and (ii) bona fide refunds and chargebacks.
+
+4.4 Reporting and Payment.
+Unless different terms are set in a Commercial Agreement:
+ • You shall provide written royalty reports to EXOCHAIN at least quarterly, stating gross revenue for each Covered Offering and the corresponding Royalty due.
+ • Royalties shall be paid within thirty (30) days after the end of each reporting period, in U.S. dollars, to the account designated by EXOCHAIN.
+ • EXOCHAIN may, at its expense and on reasonable notice, audit your relevant records no more than once per year to verify Royalty calculations. If an audit reveals an underpayment of more than five percent (5%) for the audited period, you shall reimburse EXOCHAIN’s reasonable audit costs.
+
+4.5 No Cap; Evergreen.
+The Royalty is uncapped and remains payable for the full commercial life of each Covered Offering, unless otherwise agreed in a signed Commercial Agreement with EXOCHAIN.
+
+5. Restrictions
+Except as expressly permitted in Sections 2 and 3, you may not, and may not permit any third party to:
+ • Use the Software in Production Use without a Commercial Agreement.
+ • Offer, host, resell, or provide the Software or any derivative as a managed service, SaaS, or platform to others without a Commercial Agreement.
+ • Remove or obscure any copyright, trademark, or other proprietary notices.
+ • Circumvent or attempt to circumvent any technical or contractual limitations on usage or licensing.
+ • Use any EXOCHAIN, ApexVelocity, LegalDyne, decision.forum, CrossChecked, or related trademarks without prior written permission.
+
+Any rights not expressly granted are reserved.
+
+6. Ownership
+The Software is licensed, not sold. EXOCHAIN and its licensors retain all right, title, and interest in and to the Software, including all intellectual property rights, modifications, and derivative works, subject only to the limited licenses expressly granted in this License and any applicable open-source license notices in specific files.
+
+7. No Contributor License; Separate CLAs
+Nothing in this License grants you the right to contribute changes back to the project or to impose license terms on others. Contributions, if accepted, may be governed by separate contributor license agreements or contribution terms published by EXOCHAIN.
+
+8. Disclaimer of Warranty
+THE SOFTWARE IS PROVIDED “AS IS” AND “AS AVAILABLE”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. YOUR USE OF THE SOFTWARE IS AT YOUR SOLE RISK.
+
+9. Limitation of Liability
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT WILL EXOCHAIN OR ITS AFFILIATES BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR FOR ANY LOSS OF PROFITS OR REVENUE, ARISING OUT OF OR RELATED TO THIS LICENSE OR YOUR USE OF THE SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+IN NO EVENT SHALL EXOCHAIN’S AGGREGATE LIABILITY ARISING OUT OF OR RELATED TO THIS LICENSE EXCEED ONE HUNDRED U.S. DOLLARS (US$100).
+
+10. Termination
+This License automatically terminates if you breach any of its terms. Upon termination, you must immediately cease all use of the Software, destroy all copies in your possession or control, and certify such destruction upon request. Sections 4–10 survive any termination.
+
+EXOCHAIN may, at its discretion, offer you the opportunity to cure certain breaches or to enter into a Commercial Agreement on revised terms, but is under no obligation to do so.
+
+11. Governing Law; Dispute Resolution
+This License will be governed by and construed in accordance with the laws of the State of Delaware, without regard to its conflict-of-law rules. Any disputes arising under or in connection with this License shall be resolved in the state or federal courts located in New Castle County, Delaware, and you consent to the personal jurisdiction of such courts.
+
+12. Entire Agreement; Amendments
+This License constitutes the entire agreement between you and EXOCHAIN with respect to the Software under this License and supersedes all prior or contemporaneous understandings relating to its subject matter, except for any signed Commercial Agreement between you and EXOCHAIN. EXOCHAIN may publish updated versions of this License from time to time; however, such updates will not retroactively change the terms applicable to specific versions of the Software you have already obtained unless expressly agreed in writing.
